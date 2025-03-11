@@ -1,14 +1,24 @@
 import mediapipe as mp
 import time 
 import cv2 as cv
+from comtypes import CLSCTX_ALL
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+import numpy as np
 
 # Initialization
 capture = cv.VideoCapture(0)
 mpHand1 = mp.solutions.hands
 mpHand2 = mpHand1.Hands()
 mpDraw = mp.solutions.drawing_utils
-volume = 0
 startTime = 0
+volumeInt = 0
+devices = AudioUtilities.GetSpeakers()
+interface = devices.Activate(
+    IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+volume = interface.QueryInterface(IAudioEndpointVolume)
+currentVolume = int(volume.GetMasterVolumeLevel())
+oldVolume = 0
+minVol, maxVol, _ = volume.GetVolumeRange()             # -63 to 0
 while True : 
     success, img = capture.read()
     h, w, c = img.shape
@@ -23,13 +33,17 @@ while True :
                         cx = 20
                     if cx >= 600:
                         cx = 600
-                    if int((cx/w)*100) != volume:
-                        volume = int((cx/w)*100)
+                    if volumeInt != int((cx/w)*100):
+                        volumeInt = int((cx/w)*100)
+                        print(volumeInt)
+                        currentVolume = volumeInt/100*(maxVol-minVol)+minVol
+                        oldVolume = volume.SetMasterVolumeLevel(currentVolume, None)
+                        
 
             mpDraw.draw_landmarks(img, points, mpHand1.HAND_CONNECTIONS)
     
-    cv.putText(img, str(volume), (int(volume/100*w-10), h//2-20), cv.FONT_ITALIC, 1, (255,255,255), 2)
-    cv.circle(img, (int(volume/100*w), h//2), 20, (255, 200, 150), cv.FILLED)
+    cv.putText(img, str(volumeInt), (int(volumeInt/100*w-10), h//2-20), cv.FONT_ITALIC, 1, (255,255,255), 2)
+    cv.circle(img, (int(volumeInt/100*w), h//2), 20, (255, 200, 150), cv.FILLED)
     endTime = time.time()
     fps:int = int(1/(endTime-startTime))
     startTime = endTime
